@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Gerador inteligente de relatórios profissionais — gratuito e open source.">
+<title>RelatórioAI — Gerador Inteligente de Relatórios</title>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+
+<!-- jsPDF + html2canvas for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════ */
+:root {
+  --bg:        #080e1c;
+  --surface:   #0d1628;
+  --panel:     #111f35;
+  --panel2:    #162540;
+  --border:    #1e3352;
+  --border2:   #274466;
+  --text:      #e2eaf6;
+  --muted:     #4d6b8a;
+  --accent:    #4f8ef7;
+  --accent2:   #2563eb;
+  --green:     #10b981;
+  --green-bg:  rgba(16,185,129,.1);
+  --yellow:    #f59e0b;
+  --yellow-bg: rgba(245,158,11,.1);
+  --purple:    #8b5cf6;
+  --purple-bg: rgba(139,92,246,.1);
+  --red:       #ef4444;
+  --sans:      'Inter', sans-serif;
+  --display:   'Sora', sans-serif;
+  --mono:      'JetBrains Mono', monospace;
+  --radius:    12px;
+  --shadow:    0 8px 32px rgba(0,0,0,.45);
+  --sidebar-w: 280px;
+}
+[data-theme="light"] {
+  --bg:        #f1f5fb;
+  --surface:   #ffffff;
+  --panel:     #ffffff;
+  --panel2:    #f8fafc;
+  --border:    #e2e8f0;
+  --border2:   #cbd5e1;
+  --text:      #0f172a;
+  --muted:     #64748b;
+  --shadow:    0 4px 16px rgba(0,0,0,.08);
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { font-size:14px; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: background .3s, color .3s;
+  overflow: auto;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:4px; }
+
+/* ═══════════════════════════════════════════
+   TOPBAR
+═══════════════════════════════════════════ */
+.topbar {
+  height:52px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 14px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.logo {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.logo-icon {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.logo-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 600;
+  letter-spacing: .05em;
+}
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tb-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 12px; font-weight: 500;
+  border: 1px solid var(--border2);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+  font-family: var(--sans);
+  white-space: nowrap;
+}
+.tb-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--panel2); }
+.tb-btn svg { width:13px; height:13px; flex-shrink:0; }
+.tb-btn.green { background: var(--green-bg); color: var(--green); border-color: rgba(16,185,129,.3); }
+.tb-btn.green:hover { background: rgba(16,185,129,.2); }
+.tb-btn.purple { background: var(--purple-bg); color: var(--purple); border-color: rgba(139,92,246,.3); }
+.tb-btn.purple:hover { background: rgba(139,92,246,.2); }
+.progress-wrap {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--muted);
+}
+.progress-bar {
+  width: 100px; height: 4px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  border-radius: 4px;
+  transition: width .4s ease;
+}
+
+/* ═══════════════════════════════════════════
+   APP LAYOUT
+═══════════════════════════════════════════ */
+.app {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: calc(100vh - 52px);
+}
+
+/* ═══════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════ */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width .25s, min-width .25s;
+}
+.sidebar.collapsed { width: 0; min-width: 0; }
+.sidebar-scroll { flex: 1; overflow-y: auto; padding: 16px 12px; }
+
+.sidebar-section { margin-bottom: 20px; }
+.sidebar-section-title {
+  font-family: var(--mono);
+  font-size: 9px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 6px;
+  margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* Templates */
+.template-card {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition: all .15s;
+  background: var(--panel2);
+}
+.template-card:hover { border-color: var(--accent); background: var(--panel); }
+.template-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.template-desc { font-size: 10px; color: var(--muted); }
+
+/* Section toggles */
+.section-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background .12s;
+  margin-bottom: 2px;
+  user-select: none;
+}
+.section-item:hover { background: var(--panel2); }
+.section-item.dragging { opacity: .5; }
+.section-item.drag-over { border-top: 2px solid var(--accent); }
+.drag-handle {
+  color: var(--muted);
+  cursor: grab;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.drag-handle:active { cursor: grabbing; }
+.section-toggle {
+  width: 15px; height: 15px; border-radius: 4px;
+  border: 1.5px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all .15s;
+  font-size: 9px;
+}
+.section-toggle.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.section-label { font-size: 12px; color: var(--text); flex: 1; min-width: 0; }
+.section-required { font-size: 9px; color: var(--muted); }
+
+/* Report meta */
+.meta-field { margin-bottom: 10px; }
+.meta-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
+.meta-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 7px;
+  padding: 7px 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12px;
+  outline: none;
+  transition: border-color .15s;
+}
+.meta-input:focus { border-color: var(--accent); }
+
+/* ═══════════════════════════════════════════
+   MAIN EDITOR
+═══════════════════════════════════════════ */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.editor-wrap {
+  flex: 1;
+  padding: 28px 24px 60px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Report header card */
+.report-header-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.report-header-card::before {
+  content: '';
+  position: absolute; top:0; left:0; right:0; height:3px;
+  background: linear-gradient(90deg, var(--accent), var(--purple), var(--green));
+}
+.report-title-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.report-title-input::placeholder { color: var(--muted); }
+.report-meta-row {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  font-size: 11px; color: var(--muted);
+}
+.report-meta-item {
+  display: flex; align-items: center; gap: 5px;
+}
+.report-meta-item svg { width:12px; height:12px; }
+
+/* Section blocks */
+.section-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+  animation: slideIn .25s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.section-block:focus-within {
+  border-color: var(--border2);
+  box-shadow: 0 0 0 3px rgba(79,142,247,.06);
+}
+.section-block-header {
+  display: flex; align-items: center;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.section-num {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 24px;
+}
+.section-title-display {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+.section-actions { display:flex; gap:5px; align-items:center; }
+.sec-action-btn {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  transition: all .15s;
+}
+.sec-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+.sec-action-btn.improve { border-color: rgba(139,92,246,.3); color: var(--purple); background: var(--purple-bg); }
+.sec-action-btn.improve:hover { background: rgba(139,92,246,.2); }
+
+.section-body { padding: 16px 18px; }
+.answer-area {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.75;
+  resize: none;
+  min-height: 90px;
+}
+.answer-area::placeholder { color: var(--muted); }
+.char-count { font-size: 10px; color: var(--muted); text-align: right; margin-top: 6px; font-family: var(--mono); }
+
+/* Custom question block */
+.custom-section-block {
+  border-style: dashed;
+  border-color: var(--border2);
+}
+.custom-label-input {
+  width: 100%;
+  background: transparent;
+  border: none; outline: none;
+  font-size: 13px; font-weight: 600;
+  color: var(--text);
+  font-family: var(--sans);
+}
+.custom-label-input::placeholder { color: var(--muted); }
+
+/* Add section btn */
+.add-section-bar {
+  border: 1px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 13px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px;
+  color: var(--muted); font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  margin-bottom: 14px;
+  background: none;
+  width: 100%;
+  font-family: var(--sans);
+}
+.add-section-bar:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,.04); }
+
+/* ═══════════════════════════════════════════
+   PREVIEW PANEL (right)
+═══════════════════════════════════════════ */
+.preview-panel {
+  width: 340px;
+  min-width: 340px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width .25s, min-width .25s;
+}
+.preview-panel.collapsed { width: 0; min-width: 0; }
+.preview-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.preview-title {
+  font-family: var(--mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted);
+}
+.preview-scroll { flex:1; overflow-y:auto; padding: 16px; }
+
+/* Preview doc styles */
+.preview-doc {
+  background: #fff;
+  color: #111;
+  border-radius: 8px;
+  padding: 24px 20px;
+  font-family: 'Georgia', serif;
+  font-size: 11px;
+  line-height: 1.7;
+  box-shadow: var(--shadow);
+}
+.preview-doc-title {
+  font-size: 14px; font-weight: 700;
+  margin-bottom: 6px;
+  color: #0f172a;
+  font-family: 'Arial', sans-serif;
+  border-bottom: 2px solid #1d4ed8;
+  padding-bottom: 6px;
+}
+.preview-doc-meta {
+  font-size: 9px; color: #64748b;
+  margin-bottom: 14px;
+  font-family: 'Arial', sans-serif;
+}
+.preview-section-title {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: #1d4ed8;
+  margin: 12px 0 5px;
+  font-family: 'Arial', sans-serif;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.preview-section-body {
+  font-size: 10px; color: #374151;
+  white-space: pre-wrap;
+  font-family: 'Georgia', serif;
+  line-height: 1.6;
+}
+.preview-placeholder {
+  color: #94a3b8; font-style: italic;
+}
+
+/* ═══════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  width: 480px;
+  max-width: 95vw;
+  box-shadow: var(--shadow);
+  transform: scale(.95);
+  transition: transform .2s;
+}
+.modal-overlay.open .modal { transform: scale(1); }
+.modal-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title { font-size: 14px; font-weight: 600; }
+.modal-close {
+  width:28px; height:28px; border-radius:7px;
+  border:1px solid var(--border); background:var(--panel2);
+  cursor:pointer; color:var(--muted);
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; transition:all .15s;
+}
+.modal-close:hover { border-color:var(--red); color:var(--red); }
+.modal-body { padding: 20px 22px; }
+.modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+
+/* ═══════════════════════════════════════════
+   UTILITY BUTTONS
+═══════════════════════════════════════════ */
+.btn {
+  display: inline-flex; align-items:center; gap:6px;
+  padding: 8px 16px; border-radius: 8px;
+  font-family: var(--sans); font-size:12px; font-weight:600;
+  cursor: pointer; border: none;
+  transition: all .15s;
+}
+.btn svg { width:13px; height:13px; }
+.btn-primary { background: var(--accent); color:#fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-ghost { background: var(--panel2); color:var(--text); border:1px solid var(--border2); }
+.btn-ghost:hover { border-color:var(--accent); }
+.btn-green { background: var(--green-bg); color:var(--green); border:1px solid rgba(16,185,129,.25); }
+.btn-green:hover { background:rgba(16,185,129,.18); }
+.btn-sm { padding: 5px 10px; font-size:11px; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom:20px; right:20px;
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 9px;
+  padding: 10px 16px;
+  font-size:12px; color:var(--text);
+  display:flex; align-items:center; gap:8px;
+  z-index:2000;
+  opacity:0; transform:translateY(8px);
+  transition:all .25s; pointer-events:none;
+  box-shadow:var(--shadow);
+  max-width:320px;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+.toast-icon { font-size:14px; flex-shrink:0; }
+
+/* Divider */
+.divider { border:none; border-top:1px solid var(--border); margin:16px 0; }
+
+/* Tag pill */
+.pill {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 8px; border-radius:20px;
+  font-size:10px; font-weight:500;
+}
+.pill-blue { background:rgba(79,142,247,.15); color:var(--accent); }
+
+/* Spinner */
+.spin { animation: spin .8s linear infinite; display:inline-block; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* API Key notice */
+.api-notice {
+  background: var(--yellow-bg);
+  border: 1px solid rgba(245,158,11,.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--yellow);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.api-key-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.api-key-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  outline: none;
+}
+.api-key-row input:focus { border-color: var(--accent); }
+.api-key-row button {
+  padding: 6px 10px;
+  background: var(--yellow-bg);
+  border: 1px solid rgba(245,158,11,.3);
+  border-radius: 6px;
+  color: var(--yellow);
+  font-size: 11px;
+  font-family: var(--sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.api-key-row button:hover { background: rgba(245,158,11,.2); }
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .sidebar.mobile-open { display: flex; position: fixed; inset: 52px 0 0 0; z-index: 200; width: 100% !important; min-width: 100% !important; }
+  .preview-panel { display: none; }
+  .editor-wrap { padding: 16px 14px 40px; }
+  .topbar { padding: 0 12px; gap: 8px; }
+  .logo-badge { display: none; }
+  .progress-wrap { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ TOP BAR ══ -->
+<div class="topbar">
+  <a class="logo" href="#">
+    <div class="logo-icon">📋</div>
+    <span>RelatórioAI</span>
+    <span class="logo-badge">OPEN SOURCE</span>
+  </a>
+
+  <div class="progress-wrap" style="margin-left:16px">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <span id="progressLabel" style="font-size:11px">0%</span>
+  </div>
+
+  <div class="topbar-right">
+    <button class="tb-btn" onclick="toggleSidebar()" title="Seções">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      Seções
+    </button>
+    <button class="tb-btn" onclick="togglePreview()" title="Pré-visualização">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      Preview
+    </button>
+    <button class="tb-btn" onclick="toggleTheme()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+    <button class="tb-btn" onclick="clearAll()" title="Novo relatório">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Novo
+    </button>
+    <button class="tb-btn purple" onclick="exportCSV()" title="Exportar CSV">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16h16V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      CSV
+    </button>
+    <button class="tb-btn green" onclick="exportPDF()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      PDF
+    </button>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div class="app">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-scroll">
+
+      <!-- Metadados -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Informações</div>
+        <div class="meta-field">
+          <div class="meta-label">Autor / Responsável</div>
+          <input class="meta-input" id="metaAutor" type="text" placeholder="Seu nome" maxlength="120" oninput="updateMeta()">
+        </div>
+        <div class="meta-field">
+          <div class="meta-label">Organização</div>
+          <input class="meta-input" id="metaOrg" type="text" placeholder="Empresa ou instituição" maxlength="120" oninput="updateMeta()">
+        </div>
+        <div class="meta-field">
+          <div class="meta-label">Data</div>
+          <input class="meta-input" id="metaData" type="date" oninput="updateMeta()">
+        </div>
+        <div class="meta-field">
+          <div class="meta-label">Versão</div>
+          <input class="meta-input" id="metaVersao" type="text" placeholder="v1.0" maxlength="20" oninput="updateMeta()">
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Templates -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Modelos prontos</div>
+        <div class="template-card" onclick="applyTemplate('simples')">
+          <div class="template-name">📄 Relatório Simples</div>
+          <div class="template-desc">Projeto · O que foi feito · Próximos passos</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('estagio')">
+          <div class="template-name">🎓 Relatório de Estágio</div>
+          <div class="template-desc">Atividades · Aprendizados · Dificuldades · Conclusão</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('empresarial')">
+          <div class="template-name">💼 Relatório Empresarial</div>
+          <div class="template-desc">Resumo Executivo · Resultados · Indicadores · Conclusão</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('tecnico')">
+          <div class="template-name">⚙️ Relatório Técnico</div>
+          <div class="template-desc">Objetivo · Metodologia · Execução · Resultados · Recomendações</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('mensal')">
+          <div class="template-name">📅 Relatório Mensal</div>
+          <div class="template-desc">Metas · Realizações · Indicadores · Destaques · Plano</div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Sections toggle -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">
+          Seções disponíveis
+          <span style="font-size:9px;color:var(--muted)">arrastar p/ reordenar</span>
+        </div>
+        <div id="sectionsList"></div>
+        <div style="margin-top:10px">
+          <button class="btn btn-ghost btn-sm" style="width:100%" onclick="openCustomModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M12 5v14M5 12h14"/></svg>
+            Nova pergunta personalizada
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ MAIN EDITOR ═══ -->
+  <div class="main" id="mainArea">
+    <div class="editor-wrap">
+
+      <!-- Report header -->
+      <div class="report-header-card">
+        <input
+          class="report-title-input"
+          id="reportTitle"
+          type="text"
+          placeholder="Título do Relatório..."
+          maxlength="200"
+          oninput="updateAll()"
+        >
+        <div class="report-meta-row" id="reportMetaRow">
+          <div class="report-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span id="displayAutor">—</span>
+          </div>
+          <div class="report-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span id="displayData">—</span>
+          </div>
+          <div class="report-meta-item" id="orgMetaItem" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <span id="displayOrg"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active sections render here -->
+      <div id="editorBlocks"></div>
+
+      <!-- Add custom section inline -->
+      <button class="add-section-bar" onclick="openCustomModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+        Adicionar pergunta personalizada
+      </button>
+
+    </div>
+  </div>
+
+  <!-- ═══ PREVIEW PANEL ═══ -->
+  <div class="preview-panel" id="previewPanel">
+    <div class="preview-header">
+      <div class="preview-title">Pré-visualização</div>
+      <div style="display:flex;gap:5px">
+        <span class="pill pill-blue" id="wordCountPill">0 palavras</span>
+      </div>
+    </div>
+    <div class="preview-scroll">
+      <div class="preview-doc" id="previewDoc">
+        <div class="preview-doc-title" id="pvTitle">Título do Relatório</div>
+        <div class="preview-doc-meta" id="pvMeta"></div>
+        <div id="pvSections"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CUSTOM QUESTION MODAL ═══ -->
+<div class="modal-overlay" id="customModal" role="dialog" aria-modal="true" aria-label="Nova seção personalizada">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✨ Nova Pergunta Personalizada</div>
+      <button class="modal-close" onclick="closeCustomModal()" aria-label="Fechar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:14px">
+        <label for="customSectionTitle" style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Título da seção / Pergunta</label>
+        <input id="customSectionTitle" type="text" maxlength="150"
+          style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;font-family:var(--sans)"
+          placeholder="Ex: Quais equipamentos foram utilizados?">
+      </div>
+      <div>
+        <label for="customSectionPlaceholder" style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Placeholder (dica para preenchimento)</label>
+        <input id="customSectionPlaceholder" type="text" maxlength="200"
+          style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;font-family:var(--sans)"
+          placeholder="Ex: Descreva os equipamentos e ferramentas...">
+      </div>
+      <div style="margin-top:12px;padding:12px;background:var(--panel2);border-radius:8px;font-size:11px;color:var(--muted)">
+        💡 A seção será adicionada ao relatório na sessão atual.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeCustomModal()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="addCustomSection()">Adicionar seção</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ IMPROVE MODAL ═══ -->
+<div class="modal-overlay" id="improveModal" role="dialog" aria-modal="true" aria-label="Melhorar texto com IA">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <div class="modal-title">✨ Melhorar Texto com IA</div>
+      <button class="modal-close" onclick="closeImproveModal()" aria-label="Fechar">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- API Key area -->
+      <div class="api-notice" id="apiNotice">
+        <strong>🔑 Chave de API Anthropic necessária</strong> para usar IA real.<br>
+        Obtenha em <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style="color:var(--yellow)">console.anthropic.com</a> — a chave fica apenas no seu navegador, não é salva em nenhum servidor.
+        <div class="api-key-row">
+          <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+          <button onclick="saveApiKey()">Usar chave</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label for="improveInput" style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Texto original (pode ser rascunho)</label>
+        <textarea id="improveInput" rows="4" maxlength="3000"
+          style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:var(--sans);resize:vertical"
+          placeholder="Ex: fiz tela login e corrigi erro banco de dados"></textarea>
+      </div>
+      <div style="margin-bottom:12px">
+        <label for="improveTone" style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Tom de escrita</label>
+        <select id="improveTone"
+          style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;font-family:var(--sans);cursor:pointer">
+          <option value="formal">Formal — relatórios corporativos</option>
+          <option value="tecnico">Técnico — documentação técnica</option>
+          <option value="academico">Acadêmico — trabalhos e estágios</option>
+          <option value="executivo">Executivo — resumos para gestores</option>
+        </select>
+      </div>
+      <div id="improveResult" style="display:none">
+        <label style="font-size:11px;color:var(--green);display:block;margin-bottom:5px">✅ Texto melhorado</label>
+        <div id="improveResultText"
+          style="background:var(--green-bg);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:12px;font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeImproveModal()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnDoImprove" onclick="doImprove()">
+        ✨ Melhorar Texto
+      </button>
+      <button class="btn btn-green btn-sm" id="btnApplyImprove" style="display:none" onclick="applyImproved()">
+        Aplicar ao relatório
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOAST ═══ -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span class="toast-icon" id="toastIcon">✅</span>
+  <span id="toastMsg">Pronto!</span>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   SECURITY HELPERS
+══════════════════════════════════════════════════════════ */
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(String(s || '')));
+  return d.innerHTML;
+}
+
+// Sanitize plain text input — strips control chars, trims whitespace
+function sanitizeText(s, maxLen) {
+  return String(s || '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').slice(0, maxLen || 5000);
+}
+
+/* ══════════════════════════════════════════════════════════
+   STATE  (session-only, no persistence)
+══════════════════════════════════════════════════════════ */
+const SECTIONS_DEF = [
+  { id:'nome_projeto',    label:'Nome do Projeto',          placeholder:'Nome completo do projeto...', required:false,  on:true  },
+  { id:'objetivo',        label:'Objetivo',                 placeholder:'Descreva o objetivo principal...', required:false, on:true  },
+  { id:'introducao',      label:'Introdução',               placeholder:'Contextualize o relatório...', required:false, on:false },
+  { id:'atividades',      label:'Atividades Realizadas',    placeholder:'Liste e descreva as atividades desenvolvidas no período...', required:false, on:true  },
+  { id:'metodologia',     label:'Metodologia',              placeholder:'Explique os métodos e abordagens utilizados...', required:false, on:false },
+  { id:'dificuldades',    label:'Dificuldades Encontradas', placeholder:'Descreva os obstáculos e como foram tratados...', required:false, on:false },
+  { id:'resultados',      label:'Resultados Obtidos',       placeholder:'Apresente os resultados alcançados...', required:false, on:true  },
+  { id:'proximos_passos', label:'Próximos Passos',          placeholder:'Descreva as ações planejadas para o próximo período...', required:false, on:true  },
+  { id:'conclusao',       label:'Conclusão',                placeholder:'Finalize com considerações e síntese...', required:false, on:false },
+  { id:'observacoes',     label:'Observações',              placeholder:'Informações adicionais relevantes...', required:false, on:false },
+  { id:'horas',           label:'Horas Trabalhadas',        placeholder:'Total de horas: Ex: 40h (8h/dia × 5 dias)', required:false, on:false },
+  { id:'equipe',          label:'Equipe Envolvida',         placeholder:'Liste os membros e suas funções...', required:false, on:false },
+  { id:'indicadores',     label:'Indicadores / KPIs',       placeholder:'Apresente métricas e indicadores de desempenho...', required:false, on:false },
+  { id:'aprendizados',    label:'Aprendizados',             placeholder:'O que foi aprendido durante o período?', required:false, on:false },
+  { id:'recomendacoes',   label:'Recomendações',            placeholder:'Sugestões e recomendações para a equipe...', required:false, on:false },
+  { id:'anexos',          label:'Anexos / Referências',     placeholder:'Liste os documentos anexados ou referências...', required:false, on:false },
+];
+
+const TEMPLATES = {
+  simples:     ['nome_projeto','objetivo','atividades','proximos_passos'],
+  estagio:     ['nome_projeto','atividades','aprendizados','dificuldades','conclusao'],
+  empresarial: ['nome_projeto','objetivo','introducao','atividades','resultados','indicadores','conclusao'],
+  tecnico:     ['nome_projeto','objetivo','metodologia','atividades','resultados','recomendacoes'],
+  mensal:      ['nome_projeto','objetivo','atividades','resultados','indicadores','dificuldades','proximos_passos'],
+};
+
+let sections = JSON.parse(JSON.stringify(SECTIONS_DEF));
+let answers  = {};
+let currentImproveId = null;
+let sidebarOpen  = true;
+let previewOpen  = true;
+
+// Ephemeral API key (session memory only, never persisted)
+let _apiKey = '';
+
+/* ══════════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════════ */
+(function init() {
+  document.getElementById('metaData').value = new Date().toISOString().split('T')[0];
+  renderSidebar();
+  renderEditor();
+  updateMeta();
+  updatePreview();
+})();
+
+/* ══════════════════════════════════════════════════════════
+   RENDER SIDEBAR
+══════════════════════════════════════════════════════════ */
+function renderSidebar() {
+  const el = document.getElementById('sectionsList');
+  const html = sections.map((s, i) => {
+    const toggleCls = s.on ? 'section-toggle on' : 'section-toggle';
+    const toggleTxt = s.on ? '✓' : '';
+    const reqSpan   = s.required ? '<span class="section-required">obrig.</span>' : '';
+    const rmBtn     = s.custom
+      ? `<span role="button" tabindex="0" onclick="event.stopPropagation();removeCustom(${i})"
+           onkeydown="if(event.key==='Enter'){event.stopPropagation();removeCustom(${i})}"
+           style="cursor:pointer;color:var(--red);font-size:11px;padding:0 3px;" title="Remover">✕</span>`
+      : '';
+    return `<div class="section-item${s.on?' active':''}"
+         draggable="true" data-idx="${i}"
+         ondragstart="onDragStart(event,${i})"
+         ondragover="onDragOver(event,${i})"
+         ondrop="onDrop(event,${i})"
+         ondragleave="onDragLeave(event)"
+         onclick="toggleSection(${i})"
+         role="checkbox" aria-checked="${s.on}" tabindex="0"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSection(${i})}">
+      <span class="drag-handle" title="Arrastar" aria-hidden="true">⠿</span>
+      <div class="${toggleCls}" aria-hidden="true">${toggleTxt}</div>
+      <span class="section-label">${escHtml(s.label)}</span>
+      ${reqSpan}${rmBtn}
+    </div>`;
+  }).join('');
+  el.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════════
+   RENDER EDITOR
+══════════════════════════════════════════════════════════ */
+function renderEditor() {
+  const active = sections.filter(s => s.on);
+  const el = document.getElementById('editorBlocks');
+
+  const html = active.map((s, i) => {
+    const val = escHtml(answers[s.id] || '');
+    const ph  = escHtml(s.placeholder || 'Digite aqui...');
+    const lbl = s.custom
+      ? `<input class="custom-label-input" value="${escHtml(s.label)}" maxlength="150"
+             onchange="updateSectionLabel('${escHtml(s.id)}', this.value)"
+             placeholder="Título da pergunta..." onclick="event.stopPropagation()" aria-label="Título da seção">`
+      : `<div class="section-title-display">${escHtml(s.label)}</div>`;
+
+    return `<div class="section-block${s.custom?' custom-section-block':''}" id="block_${escHtml(s.id)}">
+      <div class="section-block-header">
+        <div class="section-num">${String(i+1).padStart(2,'0')}</div>
+        ${lbl}
+        <div class="section-actions">
+          <button class="sec-action-btn improve" onclick="openImproveModal('${escHtml(s.id)}')" title="Melhorar texto com IA" aria-label="Melhorar com IA">✨</button>
+          <button class="sec-action-btn" onclick="clearSection('${escHtml(s.id)}')" title="Limpar campo" aria-label="Limpar campo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="section-body">
+        <textarea class="answer-area" id="area_${escHtml(s.id)}"
+          placeholder="${ph}"
+          oninput="onAnswer('${escHtml(s.id)}', this.value)"
+          rows="4" maxlength="10000"
+          aria-label="${escHtml(s.label)}"
+        >${val}</textarea>
+        <div class="char-count" id="cc_${escHtml(s.id)}">${(answers[s.id]||'').length} / 10000 caracteres</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = html;
+
+  // Auto-resize textareas
+  el.querySelectorAll('.answer-area').forEach(ta => initAutoResize(ta));
+  updateProgress();
+  updatePreview();
+}
+
+/* ══════════════════════════════════════════════════════════
+   SECTION INTERACTIONS
+══════════════════════════════════════════════════════════ */
+function toggleSection(i) {
+  if (sections[i].required && sections[i].on) { showToast('Esta seção é obrigatória.', '⚠️'); return; }
+  sections[i].on = !sections[i].on;
+  renderSidebar();
+  renderEditor();
+}
+
+function onAnswer(id, val) {
+  answers[id] = sanitizeText(val, 10000);
+  const cc = document.getElementById('cc_' + id);
+  if (cc) cc.textContent = answers[id].length + ' / 10000 caracteres';
+  updateProgress();
+  updatePreview();
+}
+
+function clearSection(id) {
+  answers[id] = '';
+  const ta = document.getElementById('area_' + id);
+  if (ta) { ta.value = ''; ta.style.height = '90px'; }
+  const cc = document.getElementById('cc_' + id);
+  if (cc) cc.textContent = '0 / 10000 caracteres';
+  updatePreview();
+}
+
+function updateSectionLabel(id, val) {
+  const clean = sanitizeText(val, 150);
+  const sec = sections.find(s => s.id === id);
+  if (sec) { sec.label = clean; renderSidebar(); updatePreview(); }
+}
+
+/* ══════════════════════════════════════════════════════════
+   DRAG AND DROP (sidebar reorder)
+══════════════════════════════════════════════════════════ */
+let dragFrom = null;
+function onDragStart(e, i) { dragFrom = i; e.currentTarget.classList.add('dragging'); }
+function onDragOver(e, i) {
+  e.preventDefault();
+  document.querySelectorAll('.section-item').forEach(el => el.classList.remove('drag-over'));
+  e.currentTarget.classList.add('drag-over');
+}
+function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function onDrop(e, i) {
+  e.preventDefault();
+  document.querySelectorAll('.section-item').forEach(el => el.classList.remove('drag-over','dragging'));
+  if (dragFrom === null || dragFrom === i) { dragFrom = null; return; }
+  const moved = sections.splice(dragFrom, 1)[0];
+  sections.splice(i, 0, moved);
+  dragFrom = null;
+  renderSidebar();
+  renderEditor();
+}
+
+/* ══════════════════════════════════════════════════════════
+   TEMPLATES
+══════════════════════════════════════════════════════════ */
+function applyTemplate(name) {
+  const ids = TEMPLATES[name];
+  if (!ids) return;
+
+  // Keep custom sections, rebuild order
+  const customs = sections.filter(s => s.custom);
+  sections = [
+    ...ids.map(id => {
+      const found = sections.find(s => s.id === id) || SECTIONS_DEF.find(s => s.id === id);
+      if (found) return { ...found, on: true };
+      return null;
+    }).filter(Boolean),
+    ...SECTIONS_DEF.filter(d => !ids.includes(d.id)).map(d => {
+      const found = sections.find(s => s.id === d.id);
+      return { ...(found || d), on: false };
+    }),
+    ...customs,
+  ];
+
+  renderSidebar();
+  renderEditor();
+
+  const names = {
+    simples:'Relatório Simples', estagio:'Relatório de Estágio',
+    empresarial:'Relatório Empresarial', tecnico:'Relatório Técnico', mensal:'Relatório Mensal'
+  };
+  showToast(`Modelo "${names[name]}" aplicado!`, '📋');
+}
+
+/* ══════════════════════════════════════════════════════════
+   CUSTOM SECTION
+══════════════════════════════════════════════════════════ */
+function openCustomModal() {
+  document.getElementById('customSectionTitle').value = '';
+  document.getElementById('customSectionTitle').style.borderColor = '';
+  document.getElementById('customSectionPlaceholder').value = '';
+  document.getElementById('customModal').classList.add('open');
+  setTimeout(() => document.getElementById('customSectionTitle').focus(), 200);
+}
+function closeCustomModal() { document.getElementById('customModal').classList.remove('open'); }
+
+function addCustomSection() {
+  const title = sanitizeText(document.getElementById('customSectionTitle').value.trim(), 150);
+  const ph    = sanitizeText(document.getElementById('customSectionPlaceholder').value.trim(), 200);
+
+  if (!title) {
+    document.getElementById('customSectionTitle').style.borderColor = 'var(--red)';
+    document.getElementById('customSectionTitle').focus();
+    return;
+  }
+
+  // Limit custom sections
+  if (sections.filter(s => s.custom).length >= 20) {
+    showToast('Limite de 20 seções personalizadas atingido.', '⚠️');
+    return;
+  }
+
+  const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  sections.push({ id, label: title, placeholder: ph || 'Digite aqui...', required: false, on: true, custom: true });
+
+  closeCustomModal();
+  renderSidebar();
+  renderEditor();
+  showToast(`Seção "${title}" adicionada!`, '✨');
+}
+
+function removeCustom(i) {
+  if (!confirm('Remover esta seção personalizada?')) return;
+  const id = sections[i].id;
+  delete answers[id];
+  sections.splice(i, 1);
+  renderSidebar();
+  renderEditor();
+}
+
+/* ══════════════════════════════════════════════════════════
+   API KEY (ephemeral — session memory only)
+══════════════════════════════════════════════════════════ */
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key.startsWith('sk-ant-')) {
+    showToast('Chave inválida. Deve começar com sk-ant-', '❌');
+    return;
+  }
+  _apiKey = key;
+  document.getElementById('apiNotice').innerHTML = `<span style="color:var(--green)">✅ Chave configurada para esta sessão.</span>`;
+  showToast('Chave de API salva para a sessão!', '🔑');
+}
+
+/* ══════════════════════════════════════════════════════════
+   IMPROVE TEXT (via Anthropic API)
+══════════════════════════════════════════════════════════ */
+function openImproveModal(id) {
+  currentImproveId = id;
+  document.getElementById('improveInput').value = answers[id] || '';
+  document.getElementById('improveResult').style.display = 'none';
+  document.getElementById('btnApplyImprove').style.display = 'none';
+  document.getElementById('btnDoImprove').textContent = '✨ Melhorar Texto';
+  document.getElementById('btnDoImprove').disabled = false;
+  document.getElementById('btnDoImprove').style.display = 'inline-flex';
+  document.getElementById('improveModal').classList.add('open');
+  setTimeout(() => document.getElementById('improveInput').focus(), 200);
+}
+function closeImproveModal() {
+  document.getElementById('improveModal').classList.remove('open');
+  currentImproveId = null;
+}
+
+async function doImprove() {
+  const raw  = sanitizeText(document.getElementById('improveInput').value.trim(), 3000);
+  const tone = document.getElementById('improveTone').value;
+
+  if (!raw) { showToast('Digite algum texto para melhorar.', '⚠️'); return; }
+
+  if (!_apiKey) {
+    showToast('Configure sua chave de API Anthropic primeiro.', '⚠️');
+    document.getElementById('apiKeyInput').focus();
+    return;
+  }
+
+  const btn = document.getElementById('btnDoImprove');
+  btn.innerHTML = '<span class="spin">⏳</span> Melhorando...';
+  btn.disabled = true;
+
+  const toneMap = {
+    formal:    'formal e profissional para relatórios corporativos',
+    tecnico:   'técnico e preciso para documentação de TI/engenharia',
+    academico: 'acadêmico e formal para relatórios de estágio ou trabalhos universitários',
+    executivo: 'executivo e objetivo para resumos gerenciais',
+  };
+
+  const prompt = `Você é um assistente especializado em redação profissional em português brasileiro.
+
+Reescreva o texto abaixo de forma ${toneMap[tone] || toneMap.formal}. Mantenha as informações originais, apenas melhore a gramática, coesão e formalidade. Responda APENAS com o texto melhorado, sem explicações ou comentários.
+
+Texto original:
+${raw}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': _apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const msg = err?.error?.message || `Erro HTTP ${response.status}`;
+      throw new Error(msg);
+    }
+
+    const data = await response.json();
+    const result = (data?.content?.[0]?.text || '').trim();
+
+    if (!result) throw new Error('Resposta vazia da IA.');
+
+    document.getElementById('improveResultText').textContent = result;
+    document.getElementById('improveResult').style.display = 'block';
+    document.getElementById('btnApplyImprove').style.display = 'inline-flex';
+    showToast('Texto melhorado com IA!', '✨');
+  } catch (err) {
+    console.error(err);
+    showToast('Erro: ' + (err.message || 'Verifique sua chave de API.'), '❌');
+  } finally {
+    btn.innerHTML = '✨ Melhorar Texto';
+    btn.disabled = false;
+  }
+}
+
+function applyImproved() {
+  if (!currentImproveId) return;
+  const text = sanitizeText(document.getElementById('improveResultText').textContent, 10000);
+  answers[currentImproveId] = text;
+  const ta = document.getElementById('area_' + currentImproveId);
+  if (ta) { ta.value = text; ta.dispatchEvent(new Event('input')); }
+  updatePreview();
+  closeImproveModal();
+  showToast('Texto aplicado ao relatório!', '✅');
+}
+
+/* ══════════════════════════════════════════════════════════
+   META & PROGRESS
+══════════════════════════════════════════════════════════ */
+function updateMeta() {
+  const autor = sanitizeText(document.getElementById('metaAutor').value, 120);
+  const org   = sanitizeText(document.getElementById('metaOrg').value, 120);
+  const data  = document.getElementById('metaData').value;
+
+  document.getElementById('displayAutor').textContent = autor || '—';
+
+  let dataDisplay = '—';
+  if (data) {
+    try { dataDisplay = new Date(data + 'T12:00:00').toLocaleDateString('pt-BR'); } catch(e) {}
+  }
+  document.getElementById('displayData').textContent = dataDisplay;
+
+  const orgItem = document.getElementById('orgMetaItem');
+  if (org) {
+    orgItem.style.display = 'flex';
+    document.getElementById('displayOrg').textContent = org;
+  } else {
+    orgItem.style.display = 'none';
+  }
+
+  updatePreview();
+}
+
+function updateAll() { updatePreview(); updateProgress(); }
+
+function updateProgress() {
+  const active = sections.filter(s => s.on);
+  if (!active.length) { setProgress(0); return; }
+  const title = document.getElementById('reportTitle').value.trim();
+  let filled  = title ? 1 : 0;
+  active.forEach(s => { if ((answers[s.id] || '').trim().length > 10) filled++; });
+  const pct = Math.round((filled / (active.length + 1)) * 100);
+  setProgress(pct);
+}
+
+function setProgress(pct) {
+  document.getElementById('progressFill').style.width  = pct + '%';
+  document.getElementById('progressLabel').textContent = pct + '%';
+}
+
+/* ══════════════════════════════════════════════════════════
+   PREVIEW
+══════════════════════════════════════════════════════════ */
+function updatePreview() {
+  const title  = sanitizeText(document.getElementById('reportTitle').value, 200) || 'Título do Relatório';
+  const autor  = sanitizeText(document.getElementById('metaAutor').value, 120);
+  const org    = sanitizeText(document.getElementById('metaOrg').value, 120);
+  const data   = document.getElementById('metaData').value;
+  const versao = sanitizeText(document.getElementById('metaVersao').value, 20);
+
+  document.getElementById('pvTitle').textContent = title;
+
+  const metaParts = [];
+  if (autor) metaParts.push('Por: ' + autor);
+  if (org)   metaParts.push(org);
+  if (data) {
+    try { metaParts.push(new Date(data + 'T12:00:00').toLocaleDateString('pt-BR')); } catch(e) {}
+  }
+  if (versao) metaParts.push(versao);
+  document.getElementById('pvMeta').textContent = metaParts.join(' · ');
+
+  const active = sections.filter(s => s.on);
+  let wordCount = 0;
+
+  const pvHTML = active.map((s, i) => {
+    const text = (answers[s.id] || '').trim();
+    wordCount += text ? text.split(/\s+/).filter(Boolean).length : 0;
+    const body = text
+      ? `<div class="preview-section-body">${escHtml(text)}</div>`
+      : `<div class="preview-section-body"><span class="preview-placeholder">Sem resposta ainda...</span></div>`;
+    return `<div class="preview-section-title">${String(i+1).padStart(2,'0')}. ${escHtml(s.label)}</div>${body}`;
+  }).join('');
+
+  document.getElementById('pvSections').innerHTML = pvHTML;
+  document.getElementById('wordCountPill').textContent = wordCount + ' palavras';
+}
+
+/* ══════════════════════════════════════════════════════════
+   EXPORT PDF (via jsPDF — pure client-side)
+══════════════════════════════════════════════════════════ */
+async function exportPDF() {
+  if (!window.jspdf) { showToast('Biblioteca PDF não carregada. Verifique sua conexão.', '❌'); return; }
+
+  const title  = sanitizeText(document.getElementById('reportTitle').value, 200) || 'Relatório';
+  const autor  = sanitizeText(document.getElementById('metaAutor').value, 120);
+  const org    = sanitizeText(document.getElementById('metaOrg').value, 120);
+  const data   = document.getElementById('metaData').value;
+  const versao = sanitizeText(document.getElementById('metaVersao').value, 20);
+  const active = sections.filter(s => s.on);
+
+  let dateStr = '';
+  try { dateStr = data ? new Date(data + 'T12:00:00').toLocaleDateString('pt-BR') : ''; } catch(e) {}
+  const metaParts = [autor, org, dateStr, versao].filter(Boolean);
+
+  showToast('Gerando PDF...', '⏳');
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    const pageW   = 210;
+    const pageH   = 297;
+    const marginL = 22;   // left margin
+    const marginR = 22;   // right margin
+    const marginT = 22;   // top margin
+    const marginB = 20;   // bottom margin (footer space)
+    const contentW = pageW - marginL - marginR;
+
+    // ── Cores (igual ao preview) ──
+    const C_TITLE    = [15,  23,  42];   // #0f172a  — título principal
+    const C_META     = [100, 116, 139];  // #64748b  — metadados
+    const C_SEC_HEAD = [29,  78,  216];  // #1d4ed8  — cabeçalho de seção (azul)
+    const C_BODY     = [55,  65,  81];   // #374151  — texto do corpo
+    const C_LINE     = [226, 232, 240];  // #e2e8f0  — linhas divisórias
+    const C_FOOTER   = [148, 163, 184];  // #94a3b8  — rodapé
+
+    // Helpers para controle de página
+    let cy = marginT;
+    let pageNum = 1;
+
+    function addFooter() {
+      pdf.setDrawColor(...C_LINE);
+      pdf.setLineWidth(0.3);
+      pdf.line(marginL, pageH - marginB + 2, pageW - marginR, pageH - marginB + 2);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(...C_FOOTER);
+      pdf.text('RelatórioAI', marginL, pageH - marginB + 7);
+      pdf.text(String(pageNum), pageW - marginR, pageH - marginB + 7, { align: 'right' });
+    }
+
+    function checkPageBreak(needed) {
+      if (cy + needed > pageH - marginB - 4) {
+        addFooter();
+        pdf.addPage();
+        pageNum++;
+        cy = marginT;
+        return true;
+      }
+      return false;
+    }
+
+    // ════════════════════════
+    // CABEÇALHO DO RELATÓRIO
+    // ════════════════════════
+
+    // Título grande
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    pdf.setTextColor(...C_TITLE);
+    const titleLines = pdf.splitTextToSize(title, contentW);
+    titleLines.forEach(line => {
+      pdf.text(line, marginL, cy);
+      cy += 9;
+    });
+    cy += 2;
+
+    // Linha azul abaixo do título
+    pdf.setDrawColor(...C_SEC_HEAD);
+    pdf.setLineWidth(0.8);
+    pdf.line(marginL, cy, pageW - marginR, cy);
+    cy += 5;
+
+    // Meta: "Por: Samuel Costa · SEUNE · 11/06/2026"
+    if (metaParts.length > 0) {
+      const metaStr = (autor ? 'Por: ' + autor : '') +
+        (org ? (autor ? ' · ' : '') + org : '') +
+        (dateStr ? ' · ' + dateStr : '') +
+        (versao ? ' · ' + versao : '');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(...C_META);
+      const metaLines = pdf.splitTextToSize(metaStr, contentW);
+      metaLines.forEach(line => {
+        pdf.text(line, marginL, cy);
+        cy += 5;
+      });
+    }
+    cy += 8;
+
+    // ════════════════════════
+    // SEÇÕES
+    // ════════════════════════
+    active.forEach((s, i) => {
+      const bodyText = (answers[s.id] || '').trim() || '(Sem resposta)';
+      const numLabel = String(i + 1).padStart(2, '0') + '. ' + s.label.toUpperCase();
+
+      // Espaço mínimo para o cabeçalho da seção + pelo menos 1 linha de texto
+      checkPageBreak(18);
+
+      // Número + label da seção em azul
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(...C_SEC_HEAD);
+      pdf.text(numLabel, marginL, cy);
+      cy += 4;
+
+      // Linha fina sob o título da seção
+      pdf.setDrawColor(...C_LINE);
+      pdf.setLineWidth(0.3);
+      pdf.line(marginL, cy, pageW - marginR, cy);
+      cy += 6;
+
+      // Corpo do texto
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10.5);
+      pdf.setTextColor(...C_BODY);
+      const bodyLines = pdf.splitTextToSize(bodyText, contentW);
+      bodyLines.forEach(line => {
+        checkPageBreak(7);
+        pdf.text(line, marginL, cy);
+        cy += 6.5;
+      });
+
+      cy += 8; // espaço entre seções
+    });
+
+    // Rodapé da última página
+    addFooter();
+
+    const fname   = title.replace(/[^a-zA-Z0-9\-_]/g, '_').replace(/_+/g, '_').slice(0, 60).toLowerCase();
+    const dateTag = new Date().toISOString().split('T')[0];
+    pdf.save(`${fname}_${dateTag}.pdf`);
+    showToast('PDF exportado com sucesso!', '✅');
+  } catch (e) {
+    console.error(e);
+    showToast('Erro ao gerar PDF: ' + (e.message || 'tente novamente.'), '❌');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   EXPORT CSV (puro JS — sem dependências)
+══════════════════════════════════════════════════════════ */
+function exportCSV() {
+  const title  = sanitizeText(document.getElementById('reportTitle').value, 200) || 'Relatório';
+  const autor  = sanitizeText(document.getElementById('metaAutor').value, 120);
+  const org    = sanitizeText(document.getElementById('metaOrg').value, 120);
+  const data   = document.getElementById('metaData').value;
+  const versao = sanitizeText(document.getElementById('metaVersao').value, 20);
+  const active = sections.filter(s => s.on);
+
+  const csvEsc = v => '"' + String(v || '').replace(/"/g, '""') + '"';
+
+  const rows = [
+    ['Campo', 'Resposta'],
+    ['Título', title],
+    ['Autor', autor],
+    ['Organização', org],
+    ['Data', data],
+    ['Versão', versao],
+    ['', ''],
+    ...active.map(s => [s.label, answers[s.id] || '']),
+  ];
+
+  const csv = rows.map(r => r.map(csvEsc).join(',')).join('\r\n');
+  const bom = '\uFEFF'; // UTF-8 BOM for Excel
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const dateTag = new Date().toISOString().split('T')[0];
+  const fname   = title.replace(/[^a-zA-Z0-9\-_]/g, '_').replace(/_+/g, '_').slice(0, 60).toLowerCase();
+  a.href = url;
+  a.download = `${fname}_${dateTag}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSV exportado com sucesso!', '✅');
+}
+
+/* ══════════════════════════════════════════════════════════
+   THEME / UI
+══════════════════════════════════════════════════════════ */
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const nxt = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', nxt);
+  // Theme persists only for current session — no localStorage
+}
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  const sb = document.getElementById('sidebar');
+  if (window.innerWidth <= 768) {
+    sb.classList.toggle('mobile-open', sidebarOpen);
+    sb.classList.toggle('collapsed', !sidebarOpen);
+  } else {
+    sb.classList.toggle('collapsed', !sidebarOpen);
+  }
+}
+
+function togglePreview() {
+  previewOpen = !previewOpen;
+  document.getElementById('previewPanel').classList.toggle('collapsed', !previewOpen);
+}
+
+function clearAll() {
+  if (!confirm('Iniciar novo relatório? Todo o conteúdo atual será apagado.')) return;
+  answers  = {};
+  sections = JSON.parse(JSON.stringify(SECTIONS_DEF));
+  document.getElementById('reportTitle').value = '';
+  document.getElementById('metaAutor').value   = '';
+  document.getElementById('metaOrg').value     = '';
+  document.getElementById('metaData').value    = new Date().toISOString().split('T')[0];
+  document.getElementById('metaVersao').value  = '';
+  renderSidebar();
+  renderEditor();
+  updateMeta();
+  updatePreview();
+  showToast('Novo relatório iniciado.', '📋');
+}
+
+/* ══════════════════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════════════════ */
+function initAutoResize(ta) {
+  const resize = () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.max(90, ta.scrollHeight) + 'px';
+  };
+  resize();
+  ta.addEventListener('input', resize);
+}
+
+function showToast(msg, icon) {
+  const t  = document.getElementById('toast');
+  const tm = document.getElementById('toastMsg');
+  const ti = document.getElementById('toastIcon');
+  tm.textContent = sanitizeText(msg, 200);
+  ti.textContent = icon || '✅';
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+/* ══════════════════════════════════════════════════════════
+   KEYBOARD SHORTCUTS
+══════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('customModal').classList.remove('open');
+    document.getElementById('improveModal').classList.remove('open');
+  }
+  // Ctrl/Cmd+Enter inside improve modal → trigger improve
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (document.getElementById('improveModal').classList.contains('open')) {
+      e.preventDefault();
+      doImprove();
+    }
+  }
+});
+
+// Close modals on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+</script>
+</body>
+</html>
