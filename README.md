@@ -1,12 +1,12 @@
-#  RelatórioAI
+# RelatórioAI
 
-Gerador inteligente de relatórios profissionais — **gratuito, open source e 100% client-side**.
+Gerador inteligente de relatórios profissionais — **gratuito e 100% client-side**.
 
 Nenhum dado é enviado para servidor. Tudo roda direto no navegador do usuário.
 
 ---
 
-##  Funcionalidades
+## Funcionalidades
 
 - **5 modelos prontos** — Relatório Simples, Estágio, Empresarial, Técnico e Mensal
 - **Seções personalizáveis** — ative/desative e reordene arrastando
@@ -21,7 +21,7 @@ Nenhum dado é enviado para servidor. Tudo roda direto no navegador do usuário.
 
 ---
 
-##  Como hospedar
+## Como hospedar
 
 É um único arquivo HTML estático. Não precisa de backend, banco de dados ou Node.js.
 
@@ -52,7 +52,7 @@ Nenhum dado é enviado para servidor. Tudo roda direto no navegador do usuário.
 
 ---
 
-##  Funcionalidade de IA (opcional)
+## Funcionalidade de IA (opcional)
 
 O botão ** Melhorar Texto** usa a API da Anthropic (modelo `claude-haiku`).
 
@@ -61,11 +61,9 @@ O botão ** Melhorar Texto** usa a API da Anthropic (modelo `claude-haiku`).
 - Ao fechar a aba, a chave é apagada automaticamente
 - Para obter uma chave: [console.anthropic.com](https://console.anthropic.com)
 
-Se preferir remover essa funcionalidade, basta apagar o botão `✨` e as funções `openImproveModal`, `doImprove` e `applyImproved` no HTML.
-
 ---
 
-## 🛠 Tecnologias utilizadas
+## Tecnologias utilizadas
 
 | Tecnologia | Uso | CDN |
 |---|---|---|
@@ -77,7 +75,7 @@ Nenhuma dependência de build. Sem npm, sem Webpack, sem framework.
 
 ---
 
-##  Estrutura do projeto
+## Estrutura do projeto
 
 ```
 relatorio-ai.html   ← arquivo único, tudo incluso (HTML + CSS + JS)
@@ -86,26 +84,30 @@ README.md
 
 ---
 
-##  Privacidade e segurança
+## Privacidade e segurança
 
 - **Sem cookies**, sem rastreamento, sem analytics
 - **Sem localStorage** — nenhum dado do usuário é persistido entre sessões
-- Todos os inputs passam por sanitização (`escHtml` + `sanitizeText`) antes de serem usados no DOM
+- Todos os inputs passam por sanitização antes de serem usados no DOM
 - Campos têm `maxlength` para evitar payloads abusivos
 - A chave de API Anthropic nunca sai do JavaScript em memória
 
 ---
 
-##  Licença
+## Direitos autorais
 
-MIT — use, modifique e distribua livremente.
+Copyright © 2026. Todos os direitos reservados.
+
+Este software e seu código-fonte são propriedade exclusiva do autor.
+É **proibido**, sem autorização prévia e por escrito:
+
+- Copiar ou reproduzir o código, total ou parcialmente
+- Modificar, adaptar ou criar obras derivadas
+- Distribuir, sublicenciar ou redistribuir de qualquer forma
+- Hospedar cópias do projeto em outros domínios ou servidores
+
+O uso do site hospedado pelo autor é livre para qualquer usuário final.
 
 ---
 
-##  Contribuindo
-
-Pull requests são bem-vindos! Para mudanças maiores, abra uma issue primeiro descrevendo o que deseja alterar.
-
----
-
-Feito com  — funciona em qualquer navegador moderno sem instalação.
+Feito com — funciona em qualquer navegador moderno sem instalação.
